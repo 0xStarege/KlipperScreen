@@ -261,6 +261,9 @@ class BasePanel(ScreenPanel):
         self.show_printer_select(len(self._config.get_printers()) > 1)
         for control in ('back', 'home'):
             self.set_control_sensitive(len(self._screen._cur_panels) > 1, control=control)
+        # Set sensitivity for move and more buttons based on current panel
+        self.set_control_sensitive(self._screen._cur_panels[-1] != "move", control='move')
+        self.set_control_sensitive(self._screen._cur_panels[-1] != "more", control='more')
         self.current_panel = panel
         self.set_title(panel.title)
         self.content.add(panel.content)
