@@ -76,7 +76,7 @@ class BasePanel(ScreenPanel):
         self.action_bar.set_size_request(self._gtk.action_bar_width, self._gtk.action_bar_height)
         # self.action_bar.add(self.control['back'])
         # self.action_bar.add(self.control['home'])
-        # self.action_bar.add(self.control['printer_select'])
+        self.action_bar.add(self.control['printer_select'])
         # self.action_bar.add(self.control['shortcut'])
         # self.action_bar.add(self.control['estop'])
         # self.action_bar.add(self.control['shutdown'])
