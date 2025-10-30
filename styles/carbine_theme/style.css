@@ -24,6 +24,10 @@
     font-family: RobotoMedium;
 }
 
+.action_bar {
+    border-right: 1px solid #424242;
+}
+
 junction,
 list row,
 treeview.view,
