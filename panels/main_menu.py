@@ -30,7 +30,16 @@ class Panel(MenuPanel):
 
         # Filter out some menu items we don't want shown here (icons still available elsewhere)
         menu_items = items or []
-        filtered_items = [i for i in menu_items if list(i)[0] not in ("move", "more")]
+        def _is_afc(item_dict):
+            key = list(item_dict)[0]
+            val = item_dict[key]
+            panel = str(val.get('panel') or '').lower()
+            return key.lower() == 'afc' or panel == 'afc'
+
+        filtered_items = [
+            i for i in menu_items
+            if list(i)[0] not in ("move", "more") and not _is_afc(i)
+        ]
 
         if self._screen.vertical_mode:
             self.main_menu.attach(self.create_left_panel(), 0, 0, 1, 3)
