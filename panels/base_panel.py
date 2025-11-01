@@ -17,6 +17,13 @@ except ImportError:
     psutil_available = False
     logging.debug("psutil is not installed. Unable to do battery check.")
 
+try:
+    from ks_includes.sdbus_nm import SdbusNm
+    sdbus_nm_available = True
+except Exception as e:
+    sdbus_nm_available = False
+    logging.debug(f"sdbus_nm is not available. Unable to check WiFi status: {e}")
+
 
 class BasePanel(ScreenPanel):
     def __init__(self, screen, title=None):
@@ -26,8 +33,16 @@ class BasePanel(ScreenPanel):
         self.time_format = self._config.get_main_config().getboolean("24htime", True)
         self.time_update = None
         self.battery_update = None
+        self.wifi_update = None
         self.titlebar_items = []
         self.titlebar_name_type = None
+        self.sdbus_nm = None
+        if sdbus_nm_available:
+            try:
+                self.sdbus_nm = SdbusNm(lambda msg, level=3: logging.debug(f"WiFi: {msg}"))
+            except Exception as e:
+                logging.debug(f"Failed to initialize WiFi monitoring: {e}")
+                self.sdbus_nm = None
         self.current_extruder = None
         self.last_usage_report = datetime.now()
         self.usage_report = 0
@@ -84,11 +99,13 @@ class BasePanel(ScreenPanel):
         # Add minimal menu buttons
         self.control['home'] = self._gtk.Button('main', None, None, self.abscale)
         self.control['move'] = self._gtk.Button('move', None, None, self.abscale)
+        # AFC button with spool icon
         self.control['afc'] = self._gtk.Button('spool', None, None, self.abscale)
         self.control['more'] = self._gtk.Button('settings', None, None, self.abscale)
 
         self.control['home'].connect("clicked", self._screen._menu_go_back, True)
         self.control['move'].connect("clicked", self.menu_item_clicked, {"panel": "move"})
+        # Open AFC panel when clicked
         self.control['afc'].connect("clicked", self.menu_item_clicked, {"panel": "AFC"})
         self.control['more'].connect("clicked", self._screen._go_to_submenu, "more")
 
@@ -123,10 +140,21 @@ class BasePanel(ScreenPanel):
         for widget in self.control['battery_box']:
             widget.show()
 
+        # WiFi indicator
+        self.wifi_icons = self.load_wifi_icons()
+        self.labels['wifi_icon'] = self._gtk.Image()
+        self.labels['wifi_icon'].set_from_pixbuf(self.wifi_icons['unknown'])
+        self.control['wifi_box'] = Gtk.Box(halign=Gtk.Align.END, spacing=3)
+        self.control['wifi_box'].set_no_show_all(True)
+        self.control['wifi_box'].add(self.labels['wifi_icon'])
+        for widget in self.control['wifi_box']:
+            widget.show()
+
         self.titlebar = Gtk.Box(spacing=5, valign=Gtk.Align.CENTER)
         self.titlebar.get_style_context().add_class("title_bar")
         self.titlebar.add(self.control['temp_box'])
         self.titlebar.add(self.titlelbl)
+        self.titlebar.add(self.control['wifi_box'])
         self.titlebar.add(self.control['time_box'])
         self.titlebar.add(self.control['battery_box'])
         self.set_title(title)
@@ -146,6 +174,9 @@ class BasePanel(ScreenPanel):
             self.main_grid.attach(self.content, 1, 1, 1, 1)
 
         self.update_time()
+        # Initial WiFi status check
+        if sdbus_nm_available:
+            self.wifi_status()
 
     def load_battery_icons(self):
         img_size = self._gtk.img_scale * self.bts
@@ -157,6 +188,16 @@ class BasePanel(ScreenPanel):
             '25': self._gtk.PixbufFromIcon('battery-25', img_size, img_size),
             '0': self._gtk.PixbufFromIcon('battery-0', img_size, img_size),
             'unknown': self._gtk.PixbufFromIcon('battery-unknown', img_size, img_size),
+        }
+
+    def load_wifi_icons(self):
+        img_size = self._gtk.img_scale * self.bts
+        return {
+            'excellent': self._gtk.PixbufFromIcon('wifi_excellent', img_size, img_size),
+            'good': self._gtk.PixbufFromIcon('wifi_good', img_size, img_size),
+            'fair': self._gtk.PixbufFromIcon('wifi_fair', img_size, img_size),
+            'weak': self._gtk.PixbufFromIcon('wifi_weak', img_size, img_size),
+            'unknown': self._gtk.PixbufFromIcon('wifi_weak', img_size, img_size),  # Fallback icon
         }
 
     def reload_icons(self):
@@ -175,6 +216,8 @@ class BasePanel(ScreenPanel):
 
         self.battery_icons = self.load_battery_icons()
         self.battery_percentage()
+        self.wifi_icons = self.load_wifi_icons()
+        self.wifi_status()
 
     def show_heaters(self, show=True):
         for child in self.control['temp_box'].get_children():
@@ -252,6 +295,8 @@ class BasePanel(ScreenPanel):
             self.time_update = GLib.timeout_add_seconds(1, self.update_time)
         if self.battery_update is None:
             self.battery_update = GLib.timeout_add_seconds(60, self.battery_percentage)
+        if self.wifi_update is None:
+            self.wifi_update = GLib.timeout_add_seconds(5, self.wifi_status)
 
     def add_content(self, panel):
         printing = self._printer and self._printer.state in {"printing", "paused"}
@@ -262,8 +307,11 @@ class BasePanel(ScreenPanel):
         self.show_shortcut(connected and printer_select)
         self.show_heaters(connected and printer_select)
         self.show_printer_select(len(self._config.get_printers()) > 1)
+        
+        # Update control sensitivity based on current panel
         for control in ('back', 'home'):
             self.set_control_sensitive(len(self._screen._cur_panels) > 1, control=control)
+        
         # Set sensitivity for move and more buttons based on current panel
         self.set_control_sensitive(self._screen._cur_panels[-1] != "move", control='move')
         self.set_control_sensitive(self._screen._cur_panels[-1] != "more", control='more')
@@ -438,6 +486,58 @@ class BasePanel(ScreenPanel):
         else:
             logging.debug("Battery information not available.")
             self.control['battery_box'].hide()
+            return False
+
+    def get_wifi_icon(self, signal_strength):
+        """Get WiFi icon based on signal strength (0-100)"""
+        if signal_strength is None or signal_strength < 0:
+            return self.wifi_icons['unknown']
+        elif signal_strength >= 75:
+            return self.wifi_icons['excellent']
+        elif signal_strength >= 50:
+            return self.wifi_icons['good']
+        elif signal_strength >= 25:
+            return self.wifi_icons['fair']
+        else:
+            return self.wifi_icons['weak']
+
+    def wifi_status(self):
+        """Update WiFi status indicator"""
+        if not sdbus_nm_available or self.sdbus_nm is None:
+            self.control['wifi_box'].hide()
+            return False
+        
+        try:
+            # Check if WiFi is enabled
+            if not self.sdbus_nm.is_wifi_enabled():
+                self.control['wifi_box'].hide()
+                return False
+
+            # Get connected network signal strength
+            try:
+                connected_bssid = self.sdbus_nm.get_connected_bssid()
+            except (AttributeError, TypeError):
+                connected_bssid = None
+                
+            if connected_bssid:
+                networks = self.sdbus_nm.get_networks()
+                connected_network = next(
+                    (net for net in networks if net.get('BSSID') == connected_bssid),
+                    None
+                )
+                if connected_network and 'signal_level' in connected_network:
+                    signal = connected_network['signal_level']
+                    self.labels['wifi_icon'].set_from_pixbuf(self.get_wifi_icon(signal))
+                    self.control['wifi_box'].show()
+                    return True
+            
+            # WiFi enabled but not connected
+            self.labels['wifi_icon'].set_from_pixbuf(self.wifi_icons['unknown'])
+            self.control['wifi_box'].show()
+            return True
+        except Exception as e:
+            logging.debug(f"Error checking WiFi status: {e}")
+            self.control['wifi_box'].hide()
             return False
 
     def set_ks_printer_cfg(self, printer):
