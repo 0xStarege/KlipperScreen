@@ -262,7 +262,7 @@ class Panel(MenuPanel):
 
         # Optional thumbnail at the top of the left panel
         # Replace this path with your desired thumbnail image path
-        thumbnail_path = "/home/shubham/KlipperScreen/thumbnail.png"
+        thumbnail_path = "/home/pi/KlipperScreen/thumbnail.png"
         if os.path.exists(thumbnail_path):
             thumbnail = Gtk.Image.new_from_file(thumbnail_path)
             thumbnail.set_hexpand(True)
