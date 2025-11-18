@@ -339,6 +339,45 @@ class BasePanel(ScreenPanel):
         # Set sensitivity for move and more buttons based on current panel
         self.set_control_sensitive(self._screen._cur_panels[-1] != "move", control='move')
         self.set_control_sensitive(self._screen._cur_panels[-1] != "more", control='more')
+
+        # Special handling for splash_screen: show only back, home, and shutdown buttons
+        if "splash_screen" in self._screen._cur_panels:
+            # Remove move, afc, more buttons
+            if self.control['move'] in self.action_bar.get_children():
+                self.action_bar.remove(self.control['move'])
+            if self.control['afc'] in self.action_bar.get_children():
+                self.action_bar.remove(self.control['afc'])
+            if self.control['more'] in self.action_bar.get_children():
+                self.action_bar.remove(self.control['more'])
+            # Add back button if not already present
+            if self.control['back'] not in self.action_bar.get_children():
+                self.action_bar.pack_start(self.control['back'], False, False, 0)
+                self.action_bar.reorder_child(self.control['back'], 0)
+            # Ensure home button is present
+            if self.control['home'] not in self.action_bar.get_children():
+                self.action_bar.pack_start(self.control['home'], False, False, 0)
+                self.action_bar.reorder_child(self.control['home'], 1)
+            # Ensure shutdown button is visible (it's already in action_bar)
+            self.control['shutdown'].set_visible(True)
+        else:
+            # Restore regular buttons when not on splash_screen
+            if self.control['back'] in self.action_bar.get_children():
+                self.action_bar.remove(self.control['back'])
+            # Re-add regular buttons in order if they're not present
+            if self.control['home'] not in self.action_bar.get_children():
+                self.action_bar.pack_start(self.control['home'], False, False, 0)
+                self.action_bar.reorder_child(self.control['home'], 1)  # After printer_select
+            if self.control['move'] not in self.action_bar.get_children():
+                self.action_bar.pack_start(self.control['move'], False, False, 0)
+                self.action_bar.reorder_child(self.control['move'], 2)
+            if self.control['afc'] not in self.action_bar.get_children():
+                self.action_bar.pack_start(self.control['afc'], False, False, 0)
+                self.action_bar.reorder_child(self.control['afc'], 3)
+            if self.control['more'] not in self.action_bar.get_children():
+                self.action_bar.pack_start(self.control['more'], False, False, 0)
+                self.action_bar.reorder_child(self.control['more'], 4)
+        
+        self.action_bar.show_all()
         self.current_panel = panel
         self.set_title(panel.title)
         self.content.add(panel.content)
