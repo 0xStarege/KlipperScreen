@@ -319,7 +319,7 @@ class BasePanel(ScreenPanel):
         printing = self._printer and self._printer.state in {"printing", "paused"}
         connected = self._printer and self._printer.state not in {'disconnected', 'startup', 'shutdown', 'error'}
         printer_select = 'printer_select' not in self._screen._cur_panels
-        
+
         # Special handling for splash_screen: show only back, home, and shutdown buttons
         if "splash_screen" in self._screen._cur_panels:
             # Show only back, home, and shutdown buttons
@@ -341,7 +341,7 @@ class BasePanel(ScreenPanel):
             self.show_shortcut(connected and printer_select)
             self.show_heaters(connected and printer_select)
             self.show_printer_select(len(self._config.get_printers()) > 1)
-        
+
         for control in ('back', 'home'):
             self.set_control_sensitive(len(self._screen._cur_panels) > 1, control=control)
 
@@ -542,11 +542,16 @@ class BasePanel(ScreenPanel):
             return False
 
         try:
+            # Check if WiFi is available
+            if not self.sdbus_nm.wifi:
+                self.control['wifi_box'].hide()
+                return False
+            
             # Check if WiFi is enabled
             if not self.sdbus_nm.is_wifi_enabled():
-                self.labels['wifi_icon'].set_from_pixbuf(self.wifi_icons['unknown'])
+                self.labels['wifi_icon'].set_from_pixbuf(self.wifi_icons['weak'])
                 self.control['wifi_box'].show()
-                return False
+                return True
 
             # Get connected network signal strength
             try:
@@ -555,16 +560,19 @@ class BasePanel(ScreenPanel):
                 connected_bssid = None
 
             if connected_bssid:
-                networks = self.sdbus_nm.get_networks()
-                connected_network = next(
-                    (net for net in networks if net.get('BSSID') == connected_bssid),
-                    None
-                )
-                if connected_network and 'signal_level' in connected_network:
-                    signal = connected_network['signal_level']
-                    self.labels['wifi_icon'].set_from_pixbuf(self.get_wifi_icon(signal))
-                    self.control['wifi_box'].show()
-                    return True
+                try:
+                    networks = self.sdbus_nm.get_networks()
+                    connected_network = next(
+                        (net for net in networks if net.get('BSSID') == connected_bssid),
+                        None
+                    )
+                    if connected_network and 'signal_level' in connected_network:
+                        signal = connected_network['signal_level']
+                        self.labels['wifi_icon'].set_from_pixbuf(self.get_wifi_icon(signal))
+                        self.control['wifi_box'].show()
+                        return True
+                except Exception as e:
+                    logging.debug(f"Error getting network info: {e}")
 
             # WiFi enabled but not connected
             self.labels['wifi_icon'].set_from_pixbuf(self.wifi_icons['unknown'])
