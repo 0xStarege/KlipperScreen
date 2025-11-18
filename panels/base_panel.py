@@ -526,11 +526,11 @@ class BasePanel(ScreenPanel):
         """Get WiFi icon based on signal strength (0-100)"""
         if signal_strength is None or signal_strength < 0:
             return self.wifi_icons['unknown']
-        elif signal_strength >= 75:
+        elif signal_strength > 75:
             return self.wifi_icons['excellent']
-        elif signal_strength >= 50:
+        elif signal_strength > 60:
             return self.wifi_icons['good']
-        elif signal_strength >= 25:
+        elif signal_strength > 30:
             return self.wifi_icons['fair']
         else:
             return self.wifi_icons['weak']
