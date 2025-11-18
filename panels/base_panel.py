@@ -546,7 +546,7 @@ class BasePanel(ScreenPanel):
             if not self.sdbus_nm.wifi:
                 self.control['wifi_box'].hide()
                 return False
-            
+
             # Check if WiFi is enabled
             if not self.sdbus_nm.is_wifi_enabled():
                 self.labels['wifi_icon'].set_from_pixbuf(self.wifi_icons['weak'])
