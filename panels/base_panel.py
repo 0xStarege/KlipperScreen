@@ -75,6 +75,16 @@ class BasePanel(ScreenPanel):
         self.control['shortcut'].connect("clicked", self.menu_item_clicked, self.shorcut)
         self.control['shortcut'].set_no_show_all(True)
 
+        self.control['move'] = self._gtk.Button('move', scale=self.abscale)
+        self.control['move'].connect("clicked", self.menu_item_clicked, {"panel": "move"})
+
+
+        self.control['afc'] = self._gtk.Button('spool', scale=self.abscale)
+        self.control['afc'].connect("clicked", self._screen._go_to_submenu, {"panel": "afc"})
+
+        self.control['more'] = self._gtk.Button('settings', scale=self.abscale)
+        self.control['more'].connect("clicked", self._screen._go_to_submenu, "more")
+
         # Any action bar button should close the keyboard
         for item in self.control:
             self.control[item].connect("clicked", self._screen.remove_keyboard)
@@ -90,32 +100,14 @@ class BasePanel(ScreenPanel):
         self.action_bar.get_style_context().add_class('action_bar')
         self.action_bar.set_size_request(self._gtk.action_bar_width, self._gtk.action_bar_height)
         # self.action_bar.add(self.control['back'])
-        # self.action_bar.add(self.control['home'])
-        self.action_bar.add(self.control['printer_select'])
-        # self.action_bar.add(self.control['shortcut'])
-        # self.action_bar.add(self.control['estop'])
-        # self.action_bar.add(self.control['shutdown'])
-
-        # Add minimal menu buttons
-        self.control['home'] = self._gtk.Button('main', None, None, self.abscale)
-        self.control['move'] = self._gtk.Button('move', None, None, self.abscale)
-        # AFC button with spool icon
-        self.control['afc'] = self._gtk.Button('spool', None, None, self.abscale)
-        self.control['more'] = self._gtk.Button('settings', None, None, self.abscale)
-
-        self.control['home'].connect("clicked", self._screen._menu_go_back, True)
-        self.control['move'].connect("clicked", self.menu_item_clicked, {"panel": "move"})
-        # Open AFC panel when clicked
-        self.control['afc'].connect("clicked", self.menu_item_clicked, {"panel": "AFC"})
-        self.control['more'].connect("clicked", self._screen._go_to_submenu, "more")
-
-        # Add only the minimal set of buttons
         self.action_bar.add(self.control['home'])
         self.action_bar.add(self.control['move'])
         self.action_bar.add(self.control['afc'])
         self.action_bar.add(self.control['more'])
+        self.action_bar.add(self.control['printer_select'])
+        # self.action_bar.add(self.control['shortcut'])
+        self.action_bar.add(self.control['estop'])
         self.action_bar.add(self.control['shutdown'])
-
         self.show_printer_select(len(self._config.get_printers()) > 1)
 
         # Titlebar
@@ -205,11 +197,9 @@ class BasePanel(ScreenPanel):
         for button in self.action_bar.get_children():
             img = button.get_image()
             name = button.get_name()
-            # Use the same scale calculation as Button() method
-            # When label is None, Button() multiplies scale by 1.4
-            # So: size = img_scale * abscale * 1.4
-            # This ensures consistent icon size across theme changes
-            scale = self.abscale * 1.4  # Match Button() behavior when label is None
+            # All action bar buttons use scale with no label, so apply the 1.4 multiplier
+            # This matches the Button() method logic: scale * 1.4 when label is None
+            scale = self.abscale * 1.4
             size = self._gtk.img_scale * scale
             button.set_image(self._gtk.Image(name, size, size))
 
@@ -331,8 +321,6 @@ class BasePanel(ScreenPanel):
         self.show_shortcut(connected and printer_select)
         self.show_heaters(connected and printer_select)
         self.show_printer_select(len(self._config.get_printers()) > 1)
-
-        # Update control sensitivity based on current panel
         for control in ('back', 'home'):
             self.set_control_sensitive(len(self._screen._cur_panels) > 1, control=control)
 
@@ -340,44 +328,6 @@ class BasePanel(ScreenPanel):
         self.set_control_sensitive(self._screen._cur_panels[-1] != "move", control='move')
         self.set_control_sensitive(self._screen._cur_panels[-1] != "more", control='more')
 
-        # Special handling for splash_screen: show only back, home, and shutdown buttons
-        if "splash_screen" in self._screen._cur_panels:
-            # Remove move, afc, more buttons
-            if self.control['move'] in self.action_bar.get_children():
-                self.action_bar.remove(self.control['move'])
-            if self.control['afc'] in self.action_bar.get_children():
-                self.action_bar.remove(self.control['afc'])
-            if self.control['more'] in self.action_bar.get_children():
-                self.action_bar.remove(self.control['more'])
-            # Add back button if not already present
-            if self.control['back'] not in self.action_bar.get_children():
-                self.action_bar.pack_start(self.control['back'], False, False, 0)
-                self.action_bar.reorder_child(self.control['back'], 0)
-            # Ensure home button is present
-            if self.control['home'] not in self.action_bar.get_children():
-                self.action_bar.pack_start(self.control['home'], False, False, 0)
-                self.action_bar.reorder_child(self.control['home'], 1)
-            # Ensure shutdown button is visible (it's already in action_bar)
-            self.control['shutdown'].set_visible(True)
-        else:
-            # Restore regular buttons when not on splash_screen
-            if self.control['back'] in self.action_bar.get_children():
-                self.action_bar.remove(self.control['back'])
-            # Re-add regular buttons in order if they're not present
-            if self.control['home'] not in self.action_bar.get_children():
-                self.action_bar.pack_start(self.control['home'], False, False, 0)
-                self.action_bar.reorder_child(self.control['home'], 1)  # After printer_select
-            if self.control['move'] not in self.action_bar.get_children():
-                self.action_bar.pack_start(self.control['move'], False, False, 0)
-                self.action_bar.reorder_child(self.control['move'], 2)
-            if self.control['afc'] not in self.action_bar.get_children():
-                self.action_bar.pack_start(self.control['afc'], False, False, 0)
-                self.action_bar.reorder_child(self.control['afc'], 3)
-            if self.control['more'] not in self.action_bar.get_children():
-                self.action_bar.pack_start(self.control['more'], False, False, 0)
-                self.action_bar.reorder_child(self.control['more'], 4)
-
-        self.action_bar.show_all()
         self.current_panel = panel
         self.set_title(panel.title)
         self.content.add(panel.content)
