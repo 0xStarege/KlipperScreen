@@ -50,6 +50,7 @@ class BasePanel(ScreenPanel):
         self.abscale = self.bts * 1.1
         self.control['back'] = self._gtk.Button('back', scale=self.abscale)
         self.control['back'].connect("clicked", self.back)
+        self.control['back'].set_no_show_all(True)
         self.control['home'] = self._gtk.Button('main', scale=self.abscale)
         self.control['home'].connect("clicked", self._screen._menu_go_back, True)
         for control in self.control:
@@ -77,13 +78,15 @@ class BasePanel(ScreenPanel):
 
         self.control['move'] = self._gtk.Button('move', scale=self.abscale)
         self.control['move'].connect("clicked", self.menu_item_clicked, {"panel": "move"})
-
+        self.control['move'].set_no_show_all(True)
 
         self.control['afc'] = self._gtk.Button('spool', scale=self.abscale)
         self.control['afc'].connect("clicked", self._screen._go_to_submenu, {"panel": "afc"})
+        self.control['afc'].set_no_show_all(True)
 
         self.control['more'] = self._gtk.Button('settings', scale=self.abscale)
         self.control['more'].connect("clicked", self._screen._go_to_submenu, "more")
+        self.control['more'].set_no_show_all(True)
 
         # Any action bar button should close the keyboard
         for item in self.control:
@@ -99,7 +102,7 @@ class BasePanel(ScreenPanel):
             self.action_bar.set_vexpand(True)
         self.action_bar.get_style_context().add_class('action_bar')
         self.action_bar.set_size_request(self._gtk.action_bar_width, self._gtk.action_bar_height)
-        # self.action_bar.add(self.control['back'])
+        self.action_bar.add(self.control['back'])
         self.action_bar.add(self.control['home'])
         self.action_bar.add(self.control['move'])
         self.action_bar.add(self.control['afc'])
@@ -316,11 +319,29 @@ class BasePanel(ScreenPanel):
         printing = self._printer and self._printer.state in {"printing", "paused"}
         connected = self._printer and self._printer.state not in {'disconnected', 'startup', 'shutdown', 'error'}
         printer_select = 'printer_select' not in self._screen._cur_panels
-        self.control['estop'].set_visible(printing)
-        self.control['shutdown'].set_visible(not printing)
-        self.show_shortcut(connected and printer_select)
-        self.show_heaters(connected and printer_select)
-        self.show_printer_select(len(self._config.get_printers()) > 1)
+        
+        # Special handling for splash_screen: show only back, home, and shutdown buttons
+        if "splash_screen" in self._screen._cur_panels:
+            # Show only back, home, and shutdown buttons
+            self.control['back'].show()
+            self.control['home'].show()
+            self.control['shutdown'].show()
+            self.control['move'].hide()
+            self.control['afc'].hide()
+            self.control['more'].hide()
+            self.show_heaters(False)
+        else:
+            # Normal behavior for other panels
+            self.control['back'].hide()
+            self.control['move'].show()
+            self.control['afc'].show()
+            self.control['more'].show()
+            self.control['estop'].set_visible(printing)
+            self.control['shutdown'].set_visible(not printing)
+            self.show_shortcut(connected and printer_select)
+            self.show_heaters(connected and printer_select)
+            self.show_printer_select(len(self._config.get_printers()) > 1)
+        
         for control in ('back', 'home'):
             self.set_control_sensitive(len(self._screen._cur_panels) > 1, control=control)
 
