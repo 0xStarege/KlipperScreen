@@ -534,7 +534,8 @@ class BasePanel(ScreenPanel):
         try:
             # Check if WiFi is enabled
             if not self.sdbus_nm.is_wifi_enabled():
-                self.control['wifi_box'].hide()
+                self.labels['wifi_icon'].set_from_pixbuf(self.wifi_icons['unknown'])
+                self.control['wifi_box'].show()
                 return False
 
             # Get connected network signal strength
