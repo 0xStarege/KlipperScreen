@@ -376,7 +376,7 @@ class BasePanel(ScreenPanel):
             if self.control['more'] not in self.action_bar.get_children():
                 self.action_bar.pack_start(self.control['more'], False, False, 0)
                 self.action_bar.reorder_child(self.control['more'], 4)
-        
+
         self.action_bar.show_all()
         self.current_panel = panel
         self.set_title(panel.title)
